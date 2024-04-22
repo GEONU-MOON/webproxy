@@ -202,7 +202,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
         strcpy(filename, "."); // 상대 리눅스 경로이름으로 변환 ex) '.'
         strcat(filename, uri); // 상대 리눅스 경로이름으로 변환 ex) '.' + '/index.html'
         if (uri[strlen(uri)-1] == '/') // URI가 '/'문자로 끝난다면
-            strcat(filename, "adder.html"); // 기본 파일 이름인 home.html을 추가한다. -> 11.10과제 adder.html로 변경
+            strcat(filename, "home.html"); // 기본 파일 이름인 home.html을 추가한다. -> 11.10과제 adder.html로 변경
         return 1;
     }
     else{ // Dynamic content (cgi-bin이라는 문자열 존재)
