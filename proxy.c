@@ -124,6 +124,13 @@ void doit(int fd) {
   if (current_node != NULL) {
     // 캐시에 존재하는 경우, 캐시 내용 반환
     move_to_front_cache(current_node, head, tail); // LRU 캐시 정책에 따라 노드 위치 맨 앞으로
+    char buf[MAXLINE];
+    sprintf(buf, "HTTP/1.0 200 OK\r\n");
+	  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+	  sprintf(buf, "%sConnection: close\r\n", buf);
+	  sprintf(buf, "%sContent-length: %d\r\n", buf, current_node->content_length);
+	  sprintf(buf, "%sContent-type : text/html\r\n\r\n", buf);
+	  Rio_writen(fd, buf, strlen(buf));
     Rio_writen(fd, current_node->content, current_node->content_length); // 캐시된 콘텐츠 클라이언트에게 바로 전송
     return;
   }
@@ -133,28 +140,36 @@ void doit(int fd) {
   proxyfd = Open_clientfd(host, port); // 목적지 서버로 연결
   sprintf(buf_server, "%s %s %s \r\n", method, path, version); // 서버로 보낼 요청 준비
 
-  // 캐시 저장을 위한 버퍼 초기화
-  char* buf_cache = (char*)malloc(MAX_OBJECT_SIZE);
-  strcpy(buf_cache, "");
-
   // 목적지 서버와의 통신을 위한 rio 구조체 초기화
   Rio_readinitb(&rio_server, proxyfd);
   // 서버로 전송할 HTTP 헤더 수정
   modify_http_header_for_server(buf_server, host, port, path, &rio_client);
   Rio_writen(proxyfd, buf_server, strlen(buf_server)); // 수정된 요청 서버로 전송
-
   // 서버로부터 응답을 받아 클라이언트에게 전송하며, 캐시 크기를 초과하지 않는 경우 캐시에 저장
   size_t n, total_n = 0;
-  while ((n = Rio_readlineb(&rio_server, buf_server, MAXLINE)) != 0) {
-    total_n += n;
-    Rio_writen(fd, buf_server, n);
-    if (total_n < MAX_OBJECT_SIZE) {
-      strcat(buf_cache, buf_server);
-    }
+  // while ((n = Rio_readlineb(&rio_server, buf_server, MAXLINE)) != 0) {
+  //   total_n += n;
+  //   Rio_writen(fd, buf_server, n);
+  //   if (total_n < MAX_OBJECT_SIZE) {
+  //     strcat(buf_cache, buf_server);
+  //   }
+  // }
+  // 헤더 읽기
+  while (strcmp(buf_client, "\r\n"))
+  {
+    rio_readlineb(&rio_server, buf_client, MAXLINE);
+    if (strcmp(buf_client, "Content-length: "))
+    sscanf(buf_client, "Content-length: %d", &total_n);
+    Rio_writen(fd, buf_client, strlen(buf_client));
   }
+  rio_readnb(&rio_server, buf_client, total_n);
+  Rio_writen(fd, buf_client, total_n);
   // 목적지 서버와의 연결 종료
   Close(proxyfd);
-
+  // 캐시 저장을 위한 버퍼 초기화
+  char* buf_cache = (char*)malloc(total_n);
+  memcpy(buf_cache, buf_client, total_n);
+  printf("buf_cache:%s\n\n", buf_cache);
   // 캐시에 응답 내용 저장
   insert_cache(cache_uri, head, tail, buf_cache, total_n);
 }
@@ -307,6 +322,7 @@ void modify_http_header_for_server(char *http_header, char *hostname, int port, 
   }
   // 헤더 만들기
   sprintf(http_header, "%s%s%s%s%s%s%s", http_header, host_hdr, "Connection: close\r\n", "Proxy-Connection: close\r\n", user_agent_hdr, other_hdr, "\r\n");
+
   return;
 }
 
